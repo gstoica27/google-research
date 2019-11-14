@@ -173,19 +173,65 @@ class LM(object):
     self.controller = controller
     self.sample_arc = tf.unstack(controller.sample_arc)
     self.name = name
-
+    self.base_bptt = params.base_bptt
+    # TODO: Figure out use of these
+    self.num_train_batches = None
+    self.reset_start_idx = None
+    self.should_reset = None
     # train data
-    (self.x_train, self.y_train,
-     self.num_train_batches, self.reset_start_idx,
-     self.should_reset, self.base_bptt) = data_utils.input_producer(
-         x_train, params.batch_size, params.bptt_steps, random_len=True)
+    # (self.x_train, self.y_train,
+    #  self.num_train_batches, self.reset_start_idx,
+    #  self.should_reset, self.base_bptt) = data_utils.input_producer(
+    #      x_train, params.batch_size, params.bptt_steps, random_len=True)
+    # TODO: Add this hyperparameter in the params config as default!
     params.add_hparam(
         'num_train_steps', self.num_train_batches * params.num_train_epochs)
 
     # valid data
-    (self.x_valid, self.y_valid,
-     self.num_valid_batches) = data_utils.input_producer(
-         x_valid, params.batch_size, params.bptt_steps)
+    # (self.x_valid, self.y_valid,
+    #  self.num_valid_batches) = data_utils.input_producer(
+    #      x_valid, params.batch_size, params.bptt_steps)
+
+    with tf.device('/CPU:0'):
+      self.input_iterator_handle = tf.placeholder(
+        tf.string, shape=[], name='input_iterator_handle')
+      """
+      Data Description:
+      token_ids: ids of tokens
+      masks: array of 1s or 0s indicating if phrase is zero padded to uniform length (1 = pad, 0=no)
+      pos_ids: part of speech ids for each token
+      ner_ids: named entity recognition ids for each token
+      subj_positions: token positions relative to phrase subject
+      obj_positions: token positions relative to phrase object
+
+      All components share the following size: [BatchSize, NumTokens], where NumTokens is max tokens allowed.
+      If phrases are < NumTokens, they are zero padded to reach necessary length
+      """
+      self.input_iterator = tf.data.Iterator.from_string_handle(
+        self.input_iterator_handle,
+        output_types={
+          'token_ids': tf.int64,
+          'labels': tf.int64,
+          'masks': tf.int64,
+          'pos_ids': tf.int64,
+          'ner_ids': tf.int64,
+          'subj_positions': tf.int64,
+          'obj_positions': tf.int64,
+          'deprel': tf.int64,
+        },
+        output_shapes={
+          'token_ids': [None, None],
+          'labels': [None],
+          'masks': [None, None],
+          'pos_ids': [None, None],
+          'ner_ids': [None, None],
+          'subj_positions': [None, None],
+          'obj_positions': [None, None],
+          'deprel': [None, None]
+        }
+      )
+      self.batch_input = self.input_iterator.get_next()
+      self.labels = self.batch_input['labels']
 
     self._build_params()
     self._build_train()
@@ -203,10 +249,32 @@ class LM(object):
     hidden_size = self.params.hidden_size
     with tf.variable_scope(self.name, initializer=initializer):
       with tf.variable_scope('embedding'):
-        w_emb = tf.get_variable('w', [self.params.vocab_size, hidden_size])
+        w_emb = tf.get_variable('w', [self.params.vocab_size, self.params.vocab_dim])
         dropped_w_emb = tf.layers.dropout(
             w_emb, self.params.drop_e, [self.params.vocab_size, 1],
             training=True)
+
+        pos_emb = tf.get_variable(name='pos_emb',
+                                  shape=[self.params.num_pos, self.params.pos_dim])
+        dropped_pos_emb = tf.layers.dropout(pos_emb, self.params.drop_e, [self.params.num_pos, 1], training=True)
+
+        ner_emb = tf.get_variable(name='ner_emb', shape=[self.params.num_ner,
+                                                         [self.params.num_ner, self.params.ner_dim]])
+        dropped_ner_emb = tf.layers.dropout(ner_emb,
+                                            shape=[self.params.num_ner, [self.params.num_ner, 1]],
+                                            training=True)
+
+        position_embs = tf.get_variable(name='position_embs',
+                                        shape=[2 * self.params.max_len + 1, self.params.position_dim])
+        dropped_position_embs = tf.layers.dropout(position_embs,
+                                                  shape=[2 * self.params.max_len + 1, 1],
+                                                  training=True)
+      with tf.variable_scope('encoding'):
+        enc_weight = tf.get_variable('encoding_weight',
+                                     shape=[self.params.vocab_dim + self.params.num_ner + \
+                                            self.params.num_pos + 2*self.params.max_len, hidden_size])
+        enc_bias = tf.get_variable('encoding_bias',
+                                   shape=[1, hidden_size])
 
       with tf.variable_scope('rnn_cell'):
         w_prev = tf.get_variable('w_prev', [2 * hidden_size, 2 * hidden_size])
@@ -234,6 +302,10 @@ class LM(object):
           zeros = np.zeros(init_shape, dtype=np.float32)
           batch_reset = tf.assign(batch_prev_s, zeros)
 
+      with tf.variable_scope('class_projection'):
+        class_weight = tf.get_variable(name='weight', shape=[hidden_size, self.params.num_classes])
+        class_bias = tf.get_variable(name='bias', shape=[1, 1, self.params.num_classes])
+
     self.num_params = sum([np.prod(v.shape) for v in tf.trainable_variables()
                            if v.name.startswith(self.name)]).value
     print('All children have {0} params'.format(self.num_params))
@@ -248,20 +320,32 @@ class LM(object):
     print('Each child has {0} params'.format(num_params_per_child))
 
     self.batch_init_states = {
-        's': batch_prev_s,
-        'reset': batch_reset,
+      's': batch_prev_s,
+      'reset': batch_reset,
     }
     self.train_params = {
-        'w_emb': dropped_w_emb,
-        'w_prev': dropped_w_prev,
-        'w_skip': dropped_w_skip,
-        'w_soft': w_emb,
+      'w_emb': dropped_w_emb,
+      'pos_emb': dropped_pos_emb,
+      'ner_emb': dropped_ner_emb,
+      'position_emb': dropped_position_embs,
+      'w_prev': dropped_w_prev,
+      'w_skip': dropped_w_skip,
+      'w_soft': class_weight,
+      'b_soft': class_bias,
+      'enc_w': enc_weight,
+      'enc_b': enc_bias
     }
     self.eval_params = {
-        'w_emb': w_emb,
-        'w_prev': w_prev,
-        'w_skip': w_skip,
-        'w_soft': w_emb,
+      'w_emb': w_emb,
+      'pos_emb': pos_emb,
+      'ner_emb': ner_emb,
+      'position_emb': position_embs,
+      'w_prev': w_prev,
+      'w_skip': w_skip,
+      'w_soft': class_weight,
+      'b_soft': class_bias,
+      'enc_w': enc_weight,
+      'enc_b': enc_bias
     }
 
   def _forward(self, x, y, model_params, init_states, is_training=False):
@@ -277,13 +361,38 @@ class LM(object):
     Returns:
       loss: scalar, cross-entropy loss
     """
+    # embedding weights
     w_emb = model_params['w_emb']
+    ner_embs = model_params['ner_emb']
+    pos_embs = model_params['pos_emb']
+    position_embs = model_params['position_emb']
+    # rest of model
+    enc_w = model_params['enc_w']
+    enc_b = model_params['enc_b']
     w_prev = model_params['w_prev']
     w_skip = model_params['w_skip']
     w_soft = model_params['w_soft']
+    b_soft = model_params['b_soft']
     prev_s = init_states['s']
 
-    emb = tf.nn.embedding_lookup(w_emb, x)
+    tokens = x['token_ids']
+    ners = x['ner_ids']
+    poss = x['pos_ids']
+    obj_pos = x['obj_positions']
+    subj_pos = x['subj_positions']
+    token_mask = x['masks']
+
+    token_emb = tf.nn.embedding_lookup(w_emb, tokens)
+    ner_emb = tf.nn.embedding_lookup(ner_embs, ners)
+    pos_emb = tf.nn.embedding_lookup(pos_embs, poss)
+    subj_pos_emb = tf.nn.embedding_lookup(position_embs, subj_pos + self.params.max_len)
+    obj_pos_emb = tf.nn.embedding_lookup(position_embs, obj_pos + self.params.max_len)
+
+    emb = tf.concat([token_emb, ner_emb, pos_emb, subj_pos_emb, obj_pos_emb], axis=2)
+    # --> [BatchSize, HiddenSize]
+    emb = tf.matmul(emb, enc_w) + enc_b
+
+    # emb = tf.nn.embedding_lookup(w_emb, x)
     batch_size = self.params.batch_size
     hidden_size = self.params.hidden_size
     sample_arc = self.sample_arc
@@ -304,10 +413,15 @@ class LM(object):
     if is_training:
       top_s = tf.layers.dropout(
           top_s, self.params.drop_o,
-          [self.params.batch_size, 1, self.params.hidden_size], training=True)
+          [self.params.batch_size, self.params.hidden_size], training=True)
 
-    carry_on = [tf.assign(prev_s, out_s)]
-    logits = tf.einsum('bnh,vh->bnv', top_s, w_soft)
+    logits = tf.einsum('ijk,kl->ijl', top_s, w_soft) + b_soft
+    logits = logits * token_mask
+    # [BatchSize, NumSteps, NumClass] -> [BatchSize, NumClass]
+    logits = tf.reduce_mean(logits, axis=1)
+
+    # carry_on = [tf.assign(prev_s, out_s)]
+    # logits = tf.einsum('bnh,vh->bnv', top_s, w_soft)
     loss = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=y,
                                                           logits=logits)
     loss = tf.reduce_mean(loss)
@@ -325,10 +439,10 @@ class LM(object):
       reg_loss += self.params.beta * tf.reduce_mean(
           (all_s[:, 1:, :] - all_s[:, :-1, :]) ** 2)
 
-    with tf.control_dependencies(carry_on):
-      loss = tf.identity(loss)
-      if is_training:
-        reg_loss = tf.identity(reg_loss)
+    # with tf.control_dependencies(carry_on):
+    loss = tf.identity(loss)
+    if is_training:
+      reg_loss = tf.identity(reg_loss)
 
     return reg_loss, loss
 
@@ -336,7 +450,7 @@ class LM(object):
     """Build training ops."""
     print('-' * 80)
     print('Building train graph')
-    reg_loss, loss = self._forward(self.x_train, self.y_train,
+    reg_loss, loss = self._forward(self.batch_input, self.labels,
                                    self.train_params, self.batch_init_states,
                                    is_training=True)
 
@@ -362,14 +476,15 @@ class LM(object):
 
   def _build_valid(self):
     print('Building valid graph')
-    _, loss = self._forward(self.x_valid, self.y_valid,
+    _, loss = self._forward(self.batch_input, self.labels,
                             self.eval_params, self.batch_init_states)
     self.valid_loss = loss
     self.rl_loss = loss
 
-  def eval_valid(self, sess):
+  def eval_valid(self, sess, handle_iterator, handle_string):
     """Eval 1 round on valid set."""
     total_loss = 0
+
     for _ in range(self.num_valid_batches):
       sess.run(self.batch_init_states['reset'])
       total_loss += sess.run(self.valid_loss)

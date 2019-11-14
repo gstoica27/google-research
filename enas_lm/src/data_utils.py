@@ -40,8 +40,8 @@ def input_producer(raw_data, batch_size, num_steps, shuffle=False,
       the end of a sequence.
     Otherwise, return number of batches in an epoch.
   """
+  num_batches_per_epoch = ((len(raw_data)[0] // batch_size))
 
-  num_batches_per_epoch = ((np.size(raw_data) // batch_size) - 1) // num_steps
   raw_data = tf.convert_to_tensor(raw_data, name='raw_data', dtype=tf.int32)
 
   data_len = tf.size(raw_data)
