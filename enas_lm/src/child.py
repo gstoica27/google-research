@@ -136,36 +136,36 @@ def _rnn_fn(sample_arc, x, prev_s, w_prev, w_skip, input_mask, layer_mask,
 
 def _set_default_params(params):
   """Set default hyper-parameters."""
-  params.add_hparam('alpha', 0.0)  # activation L2 reg
-  params.add_hparam('beta', 1.)  # activation slowness reg
-  params.add_hparam('best_valid_ppl_threshold', 5)
-
-  params.add_hparam('batch_size', FLAGS.child_batch_size)
-  params.add_hparam('bptt_steps', FLAGS.child_bptt_steps)
-
-  # for dropouts: dropping rate, NOT keeping rate
-  params.add_hparam('drop_e', 0.10)  # word
-  params.add_hparam('drop_i', 0.20)  # embeddings
-  params.add_hparam('drop_x', 0.75)  # input to RNN cells
-  params.add_hparam('drop_l', 0.25)  # between layers
-  params.add_hparam('drop_o', 0.75)  # output
-  params.add_hparam('drop_w', 0.00)  # weight
-
-  params.add_hparam('grad_bound', 0.1)
-  params.add_hparam('hidden_size', 200)
-  params.add_hparam('init_range', 0.04)
-  params.add_hparam('learning_rate', 20.)
-  params.add_hparam('num_train_epochs', 600)
-  params.add_hparam('vocab_size', 10000)
-
-  params.add_hparam('weight_decay', 8e-7)
+  # params.add_hparam('alpha', 0.0)  # activation L2 reg
+  # params.add_hparam('beta', 1.)  # activation slowness reg
+  # params.add_hparam('best_valid_ppl_threshold', 5)
+  #
+  # # params.add_hparam('batch_size', FLAGS.child_batch_size)
+  # # params.add_hparam('bptt_steps', FLAGS.child_bptt_steps)
+  #
+  # # for dropouts: dropping rate, NOT keeping rate
+  # params.add_hparam('drop_e', 0.10)  # word
+  # params.add_hparam('drop_i', 0.20)  # embeddings
+  # params.add_hparam('drop_x', 0.75)  # input to RNN cells
+  # params.add_hparam('drop_l', 0.25)  # between layers
+  # params.add_hparam('drop_o', 0.75)  # output
+  # params.add_hparam('drop_w', 0.00)  # weight
+  #
+  # params.add_hparam('grad_bound', 0.1)
+  # params.add_hparam('hidden_size', 200)
+  # params.add_hparam('init_range', 0.04)
+  # params.add_hparam('learning_rate', 20.)
+  # params.add_hparam('num_train_epochs', 600)
+  # # params.add_hparam('vocab_size', 10000)
+  #
+  # params.add_hparam('weight_decay', 8e-7)
   return params
 
 
 class LM(object):
   """Language model."""
 
-  def __init__(self, params, controller, x_train, x_valid, name='child'):
+  def __init__(self, params, controller, name='child'):
     print('-' * 80)
     print('Building LM')
 
@@ -183,9 +183,9 @@ class LM(object):
     #  self.num_train_batches, self.reset_start_idx,
     #  self.should_reset, self.base_bptt) = data_utils.input_producer(
     #      x_train, params.batch_size, params.bptt_steps, random_len=True)
-    # TODO: Add this hyperparameter in the params config as default!
-    params.add_hparam(
-        'num_train_steps', self.num_train_batches * params.num_train_epochs)
+    # # TODO: Add this hyperparameter in the params config as default!
+    # params.add_hparam(
+    #     'num_train_steps', self.num_train_batches * params.num_train_epochs)
 
     # valid data
     # (self.x_valid, self.y_valid,
@@ -249,7 +249,12 @@ class LM(object):
     hidden_size = self.params.hidden_size
     with tf.variable_scope(self.name, initializer=initializer):
       with tf.variable_scope('embedding'):
-        w_emb = tf.get_variable('w', [self.params.vocab_size, self.params.vocab_dim])
+        if self.params.token_embeddings is not None:
+          token_initializer = tf.constant_initializer(self.params.token_embeddings)
+        else:
+          token_initializer = initializer
+        w_emb = tf.get_variable('w', [self.params.vocab_size, self.params.vocab_dim],
+                                initializer=token_initializer)
         dropped_w_emb = tf.layers.dropout(
             w_emb, self.params.drop_e, [self.params.vocab_size, 1],
             training=True)
@@ -258,21 +263,22 @@ class LM(object):
                                   shape=[self.params.num_pos, self.params.pos_dim])
         dropped_pos_emb = tf.layers.dropout(pos_emb, self.params.drop_e, [self.params.num_pos, 1], training=True)
 
-        ner_emb = tf.get_variable(name='ner_emb', shape=[self.params.num_ner,
-                                                         [self.params.num_ner, self.params.ner_dim]])
+        ner_emb = tf.get_variable(name='ner_emb', shape=[self.params.num_ner, self.params.ner_dim])
         dropped_ner_emb = tf.layers.dropout(ner_emb,
-                                            shape=[self.params.num_ner, [self.params.num_ner, 1]],
+                                            self.params.drop_e,
+                                            [self.params.num_ner, 1],
                                             training=True)
 
         position_embs = tf.get_variable(name='position_embs',
                                         shape=[2 * self.params.max_len + 1, self.params.position_dim])
         dropped_position_embs = tf.layers.dropout(position_embs,
-                                                  shape=[2 * self.params.max_len + 1, 1],
+                                                  self.params.drop_e,
+                                                  [2 * self.params.max_len + 1, 1],
                                                   training=True)
       with tf.variable_scope('encoding'):
         enc_weight = tf.get_variable('encoding_weight',
-                                     shape=[self.params.vocab_dim + self.params.num_ner + \
-                                            self.params.num_pos + 2*self.params.max_len, hidden_size])
+                                     shape=[self.params.vocab_dim + self.params.ner_dim + \
+                                            self.params.pos_dim + 2*self.params.position_dim, hidden_size])
         enc_bias = tf.get_variable('encoding_bias',
                                    shape=[1, hidden_size])
 
@@ -380,7 +386,7 @@ class LM(object):
     poss = x['pos_ids']
     obj_pos = x['obj_positions']
     subj_pos = x['subj_positions']
-    token_mask = x['masks']
+    token_mask = tf.reshape(tf.cast(x['masks'], dtype=tf.float32), [tf.shape(tokens)[0], tf.shape(tokens)[1], 1])
 
     token_emb = tf.nn.embedding_lookup(w_emb, tokens)
     ner_emb = tf.nn.embedding_lookup(ner_embs, ners)
@@ -457,7 +463,7 @@ class LM(object):
     tf_vars = [v for v in tf.trainable_variables()
                if v.name.startswith(self.name)]
     global_step = tf.train.get_or_create_global_step()
-    lr_scale = (tf.cast(tf.shape(self.y_train)[-1], dtype=tf.float32) /
+    lr_scale = (tf.cast(tf.shape(self.labels)[-1], dtype=tf.float32) /
                 tf.cast(self.params.bptt_steps, dtype=tf.float32))
     learning_rate = utils.get_lr(global_step, self.params) * lr_scale
     if self.params.grad_bound:
@@ -485,10 +491,18 @@ class LM(object):
     """Eval 1 round on valid set."""
     total_loss = 0
 
-    for _ in range(self.num_valid_batches):
-      sess.run(self.batch_init_states['reset'])
-      total_loss += sess.run(self.valid_loss)
-    valid_ppl = np.exp(total_loss / self.num_valid_batches)
+    sess.run(handle_iterator.initializer)
+    tot_batches = 0
+    while True:
+      try:
+        sess.run(self.batch_init_states['reset'])
+        total_loss += sess.run(self.valid_loss, feed_dict={self.input_iterator_handle: handle_string})
+        tot_batches += 1
+      except tf.errors.OutOfRangeError:
+        break
+
+
+    valid_ppl = np.exp(total_loss / tot_batches)
     print('valid_ppl={0:<.2f}'.format(valid_ppl))
 
     return valid_ppl

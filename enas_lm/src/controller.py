@@ -63,18 +63,18 @@ def _lstm(x, prev_c, prev_h, w_lstm):
 
 def _set_default_params(params):
   """Add controller's default params."""
-  params.add_hparam('controller_hidden_size', 64)
-  params.add_hparam('controller_num_layers', FLAGS.controller_num_layers)
-  params.add_hparam('controller_num_functions', 4)  # tanh, relu, sigmoid, iden
-
-  params.add_hparam('controller_baseline_dec', FLAGS.controller_baseline_dec)
-  params.add_hparam('controller_entropy_weight',
-                    FLAGS.controller_entropy_weight)
-  params.add_hparam('controller_temperature', FLAGS.controller_temperature)
-  params.add_hparam('controller_tanh_constant', FLAGS.controller_tanh_constant)
-  params.add_hparam('controller_learning_rate', FLAGS.controller_learning_rate)
-  params.add_hparam('controller_num_aggregate', 10)
-  params.add_hparam('controller_num_train_steps', 25)
+  # params.add_hparam('controller_hidden_size', 64)
+  # params.add_hparam('controller_num_layers', FLAGS.controller_num_layers)
+  # params.add_hparam('controller_num_functions', 4)  # tanh, relu, sigmoid, iden
+  #
+  # params.add_hparam('controller_baseline_dec', FLAGS.controller_baseline_dec)
+  # params.add_hparam('controller_entropy_weight',
+  #                   FLAGS.controller_entropy_weight)
+  # params.add_hparam('controller_temperature', FLAGS.controller_temperature)
+  # params.add_hparam('controller_tanh_constant', FLAGS.controller_tanh_constant)
+  # params.add_hparam('controller_learning_rate', FLAGS.controller_learning_rate)
+  # params.add_hparam('controller_num_aggregate', 10)
+  # params.add_hparam('controller_num_train_steps', 25)
 
   return params
 
@@ -196,7 +196,8 @@ class Controller(object):
   def build_trainer(self, child_model):
     """Build the train ops by connecting Controller with a Child."""
     # actor
-    self.valid_loss = tf.to_float(child_model.rl_loss)
+    self.child_model = child_model
+    self.valid_loss = tf.to_float(self.child_model.rl_loss)
     self.valid_loss = tf.stop_gradient(self.valid_loss)
     self.valid_ppl = tf.exp(self.valid_loss)
     self.reward = REWARD_CONSTANT / self.valid_ppl
@@ -227,7 +228,7 @@ class Controller(object):
         train_step=self.train_step,
         num_aggregate=self.params.controller_num_aggregate)
 
-  def train(self, sess, reset_op, log_every=10):
+  def train(self, sess, reset_op, input_iterator, iterator_handle, log_every=10):
     """Train the controller for `num_steps`."""
     print('-' * 80)
     print('Training controller')
@@ -238,15 +239,19 @@ class Controller(object):
                self.reward,
                self.baseline,
                self.train_op]
-
+    sess.run(input_iterator.initializer)
     for step in range(num_steps):
-      arc, ent, reward, baseline, _ = sess.run(run_ops)
-      sess.run(reset_op)
-      if step % log_every == 0:
-        log_string = 'step={0:<5d}'.format(step)
-        log_string += ' ent={0:<7.3f}'.format(ent)
-        log_string += ' ppl={0:<7.2f}'.format(REWARD_CONSTANT / reward)
-        log_string += ' rw={0:<7.4f}'.format(reward)
-        log_string += ' bl={0:<7.4f}'.format(baseline)
-        log_string += ' arc=[{0}]'.format(' '.join([str(v) for v in arc]))
-        print(log_string)
+      try:
+        arc, ent, reward, baseline, _ = sess.run(run_ops,
+                                                 feed_dict={self.child_model.input_iterator_handle: iterator_handle})
+        sess.run(reset_op)
+        if step % log_every == 0:
+          log_string = 'step={0:<5d}'.format(step)
+          log_string += ' ent={0:<7.3f}'.format(ent)
+          log_string += ' ppl={0:<7.2f}'.format(REWARD_CONSTANT / reward)
+          log_string += ' rw={0:<7.4f}'.format(reward)
+          log_string += ' bl={0:<7.4f}'.format(baseline)
+          log_string += ' arc=[{0}]'.format(' '.join([str(v) for v in arc]))
+          print(log_string)
+      except tf.errors.OutOfRangeError:
+        sess.run(input_iterator.initializer)

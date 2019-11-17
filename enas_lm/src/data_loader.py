@@ -11,7 +11,7 @@ import requests
 import tensorflow as tf
 import numpy as np
 from tqdm import tqdm
-import enas_lm.constants as constants
+import enas_lm.src.constants as constants
 import pickle
 
 # TODO: Find way to create batches of variable lengths based on max sequence length per batch
@@ -262,7 +262,7 @@ class DataLoader(object):
 
 
 if __name__ == '__main__':
-    from vocab import Vocab
+    from enas_lm.src.vocab import Vocab
     import numpy as np
     directory = '/Volumes/External HDD/dataset/tacred/data/json'
     vocab_file = '/Volumes/External HDD/dataset/tacred/data/vocab/vocab.pkl'
