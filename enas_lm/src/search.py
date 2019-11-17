@@ -224,12 +224,12 @@ def train(params):
 
         if step >= params.num_train_steps:
           break
-      except tf.errors.InvalidArgumentError:
-        last_checkpoint = tf.train.latest_checkpoint(params.output_dir)
-        print('rolling back to previous checkpoint {0}'.format(last_checkpoint))
-        saver.restore(sess, last_checkpoint)
+      #except tf.errors.InvalidArgumentError:
+       # last_checkpoint = tf.train.latest_checkpoint(params.output_dir)
+        #print('rolling back to previous checkpoint {0}'.format(last_checkpoint))
+        #saver.restore(sess, last_checkpoint)
 
-    sess.close()
+   sess.close()
 
 
 def main(unused_args):
