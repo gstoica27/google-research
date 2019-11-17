@@ -192,44 +192,44 @@ def train(params):
     start_time = time.time()
     train_step = 0
     while True:
-      try:
-        loss, l2_reg, gn, lr, _ = sess.run(run_ops, feed_dict={lm.input_iterator_handle: train_iterator_handle})
+      # try:
+      loss, l2_reg, gn, lr, _ = sess.run(run_ops, feed_dict={lm.input_iterator_handle: train_iterator_handle})
 
-        accum_loss += loss
-        accum_step += 1
-        step = sess.run(ops['global_step'])
-        if step % params.log_every == 0:
-          train_ppl = np.exp(accum_loss / accum_step)
-          mins_so_far = (time.time() - start_time) / 60.
-          log_string = 'epoch={0:<5d}'.format(epoch)
-          log_string += ' step={0:<7d}'.format(step)
-          log_string += ' ppl={0:<9.2f}'.format(train_ppl)
-          log_string += ' lr={0:<7.2f}'.format(lr)
-          log_string += ' |w|={0:<6.2f}'.format(l2_reg)
-          log_string += ' |g|={0:<6.2f}'.format(gn)
-          log_string += ' mins={0:<.2f}'.format(mins_so_far)
-          print(log_string)
+      accum_loss += loss
+      accum_step += 1
+      step = sess.run(ops['global_step'])
+      if step % params.log_every == 0:
+        train_ppl = np.exp(accum_loss / accum_step)
+        mins_so_far = (time.time() - start_time) / 60.
+        log_string = 'epoch={0:<5d}'.format(epoch)
+        log_string += ' step={0:<7d}'.format(step)
+        log_string += ' ppl={0:<9.2f}'.format(train_ppl)
+        log_string += ' lr={0:<7.2f}'.format(lr)
+        log_string += ' |w|={0:<6.2f}'.format(l2_reg)
+        log_string += ' |g|={0:<6.2f}'.format(gn)
+        log_string += ' mins={0:<.2f}'.format(mins_so_far)
+        print(log_string)
 
-        if train_step > 0 and train_step % params.switch_interval == 0:
-          ops['controller_train_fn'](sess, ops['reset_batch_states'],
-                                     input_iterator=valid_iterator,
-                                     iterator_handle=valid_iterator_handle)
-          epoch += 1
-          accum_loss = 0
-          accum_step = 0
-          train_step += 1
-          valid_ppl = ops['eval_valid'](sess)
-          sess.run([ops['reset_batch_states']])
-          best_valid_ppl.append(valid_ppl)
+      if train_step > 0 and train_step % params.switch_interval == 0:
+        ops['controller_train_fn'](sess, ops['reset_batch_states'],
+                                 input_iterator=valid_iterator,
+                                 iterator_handle=valid_iterator_handle)
+        epoch += 1
+        accum_loss = 0
+        accum_step = 0
+        train_step += 1
+        valid_ppl = ops['eval_valid'](sess)
+        sess.run([ops['reset_batch_states']])
+        best_valid_ppl.append(valid_ppl)
 
-        if step >= params.num_train_steps:
-          break
+      if step >= params.num_train_steps:
+        break
       #except tf.errors.InvalidArgumentError:
        # last_checkpoint = tf.train.latest_checkpoint(params.output_dir)
         #print('rolling back to previous checkpoint {0}'.format(last_checkpoint))
         #saver.restore(sess, last_checkpoint)
 
-   sess.close()
+    sess.close()
 
 
 def main(unused_args):
