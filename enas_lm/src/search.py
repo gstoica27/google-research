@@ -149,19 +149,18 @@ def train(params):
   # Skip the embeddings printout
   params.add_hparam('token_embeddings', token_embs)
 
-  dataloader = DataLoader(dataset_name='tacred', vocab=vocab, do_lower=params.do_lower)
-  train_dataset = dataloader.train_dataset(directory=FLAGS.data_path,
+  g = tf.Graph()
+  with g.as_default():
+    dataloader = DataLoader(dataset_name='tacred', vocab=vocab, do_lower=params.do_lower)
+    train_dataset = dataloader.train_dataset(directory=FLAGS.data_path,
                                            batch_size=FLAGS.batch_size,
                                            dropout_prob=0.)
-  valid_dataset = dataloader.eval_dataset(directory=FLAGS.data_path,
+    valid_dataset = dataloader.eval_dataset(directory=FLAGS.data_path,
                                           batch_size=FLAGS.batch_size,
                                           dataset_type='dev')
 
-  train_iterator = train_dataset.make_one_shot_iterator()
-  valid_iterator = valid_dataset.make_initializable_iterator()
-
-  g = tf.Graph()
-  with g.as_default():
+    train_iterator = train_dataset.make_one_shot_iterator()
+    valid_iterator = valid_dataset.make_initializable_iterator()
     ops, lm, ct = get_ops(params, x_train, x_valid)
     run_ops = [
         ops['train_loss'],
