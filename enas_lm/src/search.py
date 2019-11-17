@@ -40,11 +40,15 @@ flags = tf.app.flags
 gfile = tf.gfile
 FLAGS = flags.FLAGS
 
-flags.DEFINE_boolean('reset_output_dir', False, '/Volumes/External HDD/dataset/reset_output')
-flags.DEFINE_string('output_dir', '/Volumes/External HDD/dataset/output', '')
-flags.DEFINE_string('data_path', '/Volumes/External HDD/dataset/tacred/data/json', '')
-flags.DEFINE_string('vocab_file', '/Volumes/External HDD/dataset/tacred/data/vocab/vocab.pkl', '')
-flags.DEFINE_string('token_emb_file', '/Volumes/External HDD/dataset/tacred/data/vocab/embedding.npy', '')
+#flags.DEFINE_boolean('reset_output_dir', False, '/Volumes/External HDD/dataset/reset_output')
+#flags.DEFINE_string('output_dir', '/Volumes/External HDD/dataset/output', '')
+#flags.DEFINE_string('data_path', '/Volumes/External HDD/dataset/tacred/data/json', '')
+#flags.DEFINE_string('vocab_file', '/Volumes/External HDD/dataset/tacred/data/vocab/vocab.pkl', '')
+flags.DEFINE_boolean('reset_output_dir', False, '/usr0/home/gis/research/enas_re/tmp/datasets/tacred/reset_output')
+flags.DEFINE_string('output_dir', '/usr0/home/gis/research/enas_re/tmp/datasets/tacred/output', '')
+flags.DEFINE_string('data_path', '/usr0/home/gis/research/enas_re/tmp/datasets/tacred/data/json', '')
+flags.DEFINE_string('vocab_file', '/usr0/home/gis/research/enas_re/tmp/datasets/tacred/vocab/vocab.pkl', '')
+flags.DEFINE_string('token_emb_file', '/usr0/home/gis/research/enas_re/tmp/datasets/tacred/vocab/embedding.npy', '')
 flags.DEFINE_integer('log_every', 200, '')
 flags.DEFINE_integer('batch_size', 50, '')
 
