@@ -419,7 +419,7 @@ class LM(object):
     if is_training:
       top_s = tf.layers.dropout(
           top_s, self.params.drop_o,
-          [self.params.batch_size, self.params.hidden_size], training=True)
+          [self.params.batch_size, 1, self.params.hidden_size], training=True)
 
     logits = tf.einsum('ijk,kl->ijl', top_s, w_soft) + b_soft
     logits = logits * token_mask
