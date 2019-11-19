@@ -217,11 +217,13 @@ def train(params):
         epoch += 1
         accum_loss = 0
         accum_step = 0
-        train_step += 1
+        train_step = 0
+
         valid_ppl = ops['eval_valid'](sess)
         sess.run([ops['reset_batch_states']])
         best_valid_ppl.append(valid_ppl)
 
+      train_step += 1
       if step >= params.num_train_steps:
         break
       #except tf.errors.InvalidArgumentError:
@@ -264,7 +266,7 @@ def main(unused_args):
       do_lower=True,
       num_train_batches=1000,
       num_train_steps=50000,
-      switch_interval=1000,
+      switch_interval=100,
       base_bptt=35,
       bptt_steps=35,
       batch_size=FLAGS.batch_size
