@@ -24,6 +24,7 @@ import tensorflow as tf
 
 from enas_lm.src import data_utils
 from enas_lm.src import utils
+from enas_lm.src.scorer import score
 
 
 flags = tf.app.flags
@@ -424,12 +425,12 @@ class LM(object):
     logits = tf.einsum('ijk,kl->ijl', top_s, w_soft) + b_soft
     logits = logits * token_mask
     # [BatchSize, NumSteps, NumClass] -> [BatchSize, NumClass]
-    logits = tf.reduce_mean(logits, axis=1)
+    self.logits = tf.reduce_mean(logits, axis=1)
 
     # carry_on = [tf.assign(prev_s, out_s)]
     # logits = tf.einsum('bnh,vh->bnv', top_s, w_soft)
     loss = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=y,
-                                                          logits=logits)
+                                                          logits=self.logits)
     loss = tf.reduce_mean(loss)
 
     reg_loss = loss  # `loss + regularization_terms` is for training only
@@ -493,11 +494,24 @@ class LM(object):
 
     sess.run(handle_iterator.initializer)
     tot_batches = 0
+    all_predictions = []
+    all_labels = []
     while True:
       try:
         sess.run(self.batch_init_states['reset'])
-        total_loss += sess.run(self.valid_loss, feed_dict={self.input_iterator_handle: handle_string})
+        logits, labels, batch_loss = sess.run(self.logits, self.labels, self.valid_loss,
+                                              feed_dict={self.input_iterator_handle: handle_string})
+        total_loss += batch_loss
         tot_batches += 1
+        # Compute Validation Metrics
+        # [BatchSize, NumClasses]
+        predictions = np.reshape(np.argmax(logits, axis=1), [-1])
+        labels = np.reshape(labels, [-1])
+        all_predictions += predictions
+        all_labels += labels
+
+        score(all_labels, all_predictions)
+
       except tf.errors.OutOfRangeError:
         break
 
