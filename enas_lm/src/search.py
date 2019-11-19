@@ -89,7 +89,7 @@ def set_default_args(params):
     params.add_hparam('num_train_epochs', 600)
     # params.add_hparam('vocab_size', 10000)
 
-    params.add_hparam('weight_decay', 8e-7)
+    params.add_hparam('weight_decay', 1.0)#8e-7)
 
     return params
 
