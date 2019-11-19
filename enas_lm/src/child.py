@@ -510,10 +510,10 @@ class LM(object):
         all_predictions += list(predictions)
         all_labels += list(labels)
 
-        score(all_labels, all_predictions)
-
       except tf.errors.OutOfRangeError:
         break
+
+      score(all_labels, all_predictions)
 
 
     valid_ppl = np.exp(total_loss / tot_batches)
