@@ -507,8 +507,8 @@ class LM(object):
         # [BatchSize, NumClasses]
         predictions = np.reshape(np.argmax(logits, axis=1), [-1])
         labels = np.reshape(labels, [-1])
-        all_predictions += predictions
-        all_labels += labels
+        all_predictions += list(predictions)
+        all_labels += list(labels)
 
         score(all_labels, all_predictions)
 
