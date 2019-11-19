@@ -436,7 +436,7 @@ class LM(object):
     reg_loss = loss  # `loss + regularization_terms` is for training only
     if is_training:
       # L2 weight reg
-      self.l2_reg_loss = tf.add_n([tf.nn.l2_loss(w ** 2) for w in var_s])
+      self.l2_reg_loss = tf.add_n([tf.nn.l2_loss(w) for w in var_s])
       reg_loss += self.params.weight_decay * self.l2_reg_loss
 
       # activation L2 reg
