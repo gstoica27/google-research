@@ -65,7 +65,7 @@ def set_default_args(params):
     params.add_hparam('controller_tanh_constant', FLAGS.controller_tanh_constant)
     params.add_hparam('controller_learning_rate', FLAGS.controller_learning_rate)
     params.add_hparam('controller_num_aggregate', 10)
-    params.add_hparam('controller_num_train_steps', 25)
+    params.add_hparam('controller_num_train_steps', 2) # TODO: originally 25
 
     params.add_hparam('alpha', 0.0)  # activation L2 reg
     params.add_hparam('beta', 1.)  # activation slowness reg
@@ -266,7 +266,7 @@ def main(unused_args):
       do_lower=True,
       num_train_batches=1000,
       num_train_steps=50000,
-      switch_interval=100,
+      switch_interval=100, # TODO: should be 1000
       base_bptt=35,
       bptt_steps=35,
       batch_size=FLAGS.batch_size

@@ -499,7 +499,7 @@ class LM(object):
     while True:
       try:
         sess.run(self.batch_init_states['reset'])
-        logits, labels, batch_loss = sess.run(self.logits, self.labels, self.valid_loss,
+        logits, labels, batch_loss = sess.run([self.logits, self.labels, self.valid_loss],
                                               feed_dict={self.input_iterator_handle: handle_string})
         total_loss += batch_loss
         tot_batches += 1
