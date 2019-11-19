@@ -219,7 +219,7 @@ def train(params):
         accum_step = 0
         train_step = 0
 
-        valid_ppl = ops['eval_valid'](sess)
+        valid_ppl = ops['eval_valid'](sess, handle_iterator=valid_iterator, handle_string=valid_iterator_handle)
         sess.run([ops['reset_batch_states']])
         best_valid_ppl.append(valid_ppl)
 
