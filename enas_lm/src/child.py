@@ -515,8 +515,8 @@ class LM(object):
       except tf.errors.OutOfRangeError:
         break
 
-    score(all_labels, all_predictions)
+    prec_micro, recall_micro, f1_micro = score(all_labels, all_predictions)
     valid_ppl = np.exp(total_loss / tot_batches)
     print('valid_ppl={0:<.2f}'.format(valid_ppl))
 
-    return valid_ppl
+    return valid_ppl, prec_micro, recall_micro, f1_micro

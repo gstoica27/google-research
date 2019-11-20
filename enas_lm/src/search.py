@@ -158,9 +158,13 @@ def train(params):
     valid_dataset = dataloader.eval_dataset(directory=FLAGS.data_path,
                                           batch_size=FLAGS.batch_size,
                                           dataset_type='dev')
+    test_dataset = dataloader.eval_dataset(directory=FLAGS.data_path,
+                                           batch_size=FLAGS.batch_size,
+                                           dataset_type='test')
 
     train_iterator = train_dataset.make_one_shot_iterator()
     valid_iterator = valid_dataset.make_initializable_iterator()
+    test_iterator = test_dataset.make_initializable_iterator()
     ops, lm, ct = get_ops(params, x_train, x_valid)
     run_ops = [
         ops['train_loss'],
@@ -184,6 +188,7 @@ def train(params):
 
     train_iterator_handle = sess.run(train_iterator.string_handle())
     valid_iterator_handle = sess.run(valid_iterator.string_handle())
+    test_iterator_handle = sess.run(test_iterator.string_handle())
 
     accum_loss = 0
     accum_step = 0
@@ -191,6 +196,9 @@ def train(params):
     best_valid_ppl = []
     start_time = time.time()
     train_step = 0
+    best_step = 0.
+    best_valid_metrics = {'ppl': 0., 'recall': 0., 'precision': 0., 'f1': 0.}
+    best_test_at_best_valid_metrics = {'ppl': 0., 'recall': 0., 'precision': 0., 'f1': 0.}
     while True:
       # try:
       loss, l2_reg, gn, lr, _ = sess.run(run_ops, feed_dict={lm.input_iterator_handle: train_iterator_handle})
@@ -218,10 +226,38 @@ def train(params):
         accum_loss = 0
         accum_step = 0
         train_step = 0
+        print('Validation Performance: ')
+        valid_ppl, valid_prec_micro, valid_recall_micro, valid_f1_micro  = ops['eval_valid'](
+            sess,
+            handle_iterator=valid_iterator,
+            handle_string=valid_iterator_handle
+        )
+        sess.run([ops['reset_batch_states']])
 
-        valid_ppl = ops['eval_valid'](sess, handle_iterator=valid_iterator, handle_string=valid_iterator_handle)
+        print('Test Performance: ')
+        test_ppl, test_prec_micro, test_recall_micro, test_f1_micro = ops['eval_valid'](
+            sess,
+            handle_iterator=test_iterator,
+            handle_string=test_iterator_handle
+        )
         sess.run([ops['reset_batch_states']])
         best_valid_ppl.append(valid_ppl)
+
+        if valid_f1_micro > best_valid_metrics['f1']:
+          best_valid_metrics = {'f1': valid_f1_micro,
+                                'ppl': valid_ppl,
+                                'precision': valid_prec_micro,
+                                'recall': valid_recall_micro}
+          best_test_at_best_valid_metrics = {'f1': test_f1_micro,
+                                             'ppl': test_ppl,
+                                             'precision': test_prec_micro,
+                                             'recall': test_recall_micro}
+        print("Best Test so far at step {}: ".format(train_step))
+        print('PPL: {} | Recall: {} | Precision: {} | F1: {}'.format(best_test_at_best_valid_metrics['ppl'],
+                                                                     best_test_at_best_valid_metrics['recall'],
+                                                                     best_test_at_best_valid_metrics['precision'],
+                                                                     best_test_at_best_valid_metrics['f1']))
+
 
       train_step += 1
       if step >= params.num_train_steps:
