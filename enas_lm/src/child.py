@@ -61,6 +61,8 @@ def _rnn_fn(sample_arc, x, prev_s, w_prev, w_skip, input_mask, layer_mask,
     next_s: [batch_size, hidden_size].
     all_s: [[batch_size, num_steps, hidden_size] * num_layers].
   """
+  # TODO: Assert this change is fine!
+  prev_s = tf.zeros([tf.shape(x)[0], params.hidden_size], dtype=tf.float32)
   batch_size = x.get_shape()[0].value
   num_steps = tf.shape(x)[1]
   num_layers = len(sample_arc) // 2
