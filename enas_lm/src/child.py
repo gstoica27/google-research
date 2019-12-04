@@ -519,7 +519,7 @@ class LM(object):
     predictions_save_path = '/usr0/home/gis/research/enas_re/tmp/datasets/tacred/output/prediction_debugging.pkl'
     predictions_debugging = {'all_labels': all_labels, 'all_predictions': all_predictions}
     print('saving predictions to: {}'.format(predictions_save_path))
-    with open(predictions_save_path, 'rb') as handle:
+    with open(predictions_save_path, 'wb') as handle:
       pickle.dump(predictions_debugging, handle)
 
     prec_micro, recall_micro, f1_micro = score(all_labels, all_predictions)
