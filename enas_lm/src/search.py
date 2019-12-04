@@ -85,7 +85,7 @@ def set_default_args(params):
     params.add_hparam('grad_bound', 0.1)
     params.add_hparam('hidden_size', 200)
     params.add_hparam('init_range', 0.04)
-    params.add_hparam('learning_rate', 20.)
+    params.add_hparam('learning_rate', 10.)
     params.add_hparam('num_train_epochs', 600)
     # params.add_hparam('vocab_size', 10000)
 
@@ -219,6 +219,23 @@ def train(params):
         print(log_string)
 
       if train_step > 0 and train_step % params.switch_interval == 0:
+        print('Performance before Switching to Controller: ')
+        print('Validation Performance: ')
+        valid_ppl, valid_prec_micro, valid_recall_micro, valid_f1_micro = ops['eval_valid'](
+          sess,
+          handle_iterator=valid_iterator,
+          handle_string=valid_iterator_handle
+        )
+        sess.run([ops['reset_batch_states']])
+
+        print('Test Performance: ')
+        test_ppl, test_prec_micro, test_recall_micro, test_f1_micro = ops['eval_valid'](
+          sess,
+          handle_iterator=test_iterator,
+          handle_string=test_iterator_handle
+        )
+
+        print('Training Controller...')
         ops['controller_train_fn'](sess, ops['reset_batch_states'],
                                  input_iterator=valid_iterator,
                                  iterator_handle=valid_iterator_handle)
@@ -226,6 +243,8 @@ def train(params):
         accum_loss = 0
         accum_step = 0
         train_step = 0
+
+        print('Performance after switching to controller:')
         print('Validation Performance: ')
         valid_ppl, valid_prec_micro, valid_recall_micro, valid_f1_micro  = ops['eval_valid'](
             sess,
@@ -300,9 +319,9 @@ def main(unused_args):
       num_ner=len(constants.NER_TO_ID),
       max_len=100,
       do_lower=True,
-      num_train_batches=1000,
+      num_train_batches=2000,
       num_train_steps=50000,
-      switch_interval=1000, # TODO: should be 1000
+      switch_interval=3000, # TODO: should be 1000
       base_bptt=35,
       bptt_steps=35,
       batch_size=FLAGS.batch_size
