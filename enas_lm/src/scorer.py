@@ -9,7 +9,7 @@ import argparse
 import sys
 from collections import Counter
 
-NO_RELATION = "no_relation"
+NO_RELATION = 0 #"no_relation"
 
 
 def parse_arguments():
@@ -49,13 +49,14 @@ def score(key, prediction, verbose=False):
         relations = gold_by_relation.keys()
         longest_relation = 0
         for relation in sorted(relations):
-            longest_relation = max(len(relation), longest_relation)
+            # longest_relation = max(len(relation), longest_relation)
+            longest_relation = max(longest_relation, gold_by_relation[relation])
         for relation in sorted(relations):
             # (compute the score)
             correct = correct_by_relation[relation]
             guessed = guessed_by_relation[relation]
             gold = gold_by_relation[relation]
-            prec = 1.0
+            prec = 0.0
             if guessed > 0:
                 prec = float(correct) / float(guessed)
             recall = 0.0
@@ -85,7 +86,7 @@ def score(key, prediction, verbose=False):
     # Print the aggregate score
     if verbose:
         print("Final Score:")
-    prec_micro = 1.0
+    prec_micro = 0.0
     if sum(guessed_by_relation.values()) > 0:
         prec_micro = float(sum(correct_by_relation.values())) / float(sum(guessed_by_relation.values()))
     recall_micro = 0.0
@@ -102,16 +103,25 @@ def score(key, prediction, verbose=False):
 
 if __name__ == "__main__":
     # Parse the arguments from stdin
-    args = parse_arguments()
-    key = [str(line).rstrip('\n') for line in open(str(args.gold_file))]
-    prediction = [str(line).rstrip('\n') for line in open(str(args.pred_file))]
+
+    # args = parse_arguments()
+    # key = [str(line).rstrip('\n') for line in open(str(args.gold_file))]
+    # prediction = [str(line).rstrip('\n') for line in open(str(args.pred_file))]
+
+    import pickle
+
+    file = '/Users/georgestoica/Desktop/icloud_desktop/Research/google-research/enas_lm/src/datasets/prediction_debugging.pkl'
+    with open(file, 'rb') as handle:
+        data = pickle.load(handle)
+        all_labels = data['all_labels']
+        all_predictions = data['all_predictions']
 
     # Check that the lengths match
-    if len(prediction) != len(key):
+    if len(all_labels) != len(all_predictions):
         print("Gold and prediction file must have same number of elements: %d in gold vs %d in prediction" % (
-        len(key), len(prediction)))
+        len(all_labels), len(all_predictions)))
         exit(1)
 
     # Score the predictions
-    score(key, prediction, verbose=True)
+    score(all_labels, all_predictions, verbose=True)
 
