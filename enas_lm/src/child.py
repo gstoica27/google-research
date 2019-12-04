@@ -25,7 +25,7 @@ import tensorflow as tf
 from enas_lm.src import data_utils
 from enas_lm.src import utils
 from enas_lm.src.scorer import score
-
+import pickle
 
 flags = tf.app.flags
 FLAGS = flags.FLAGS
@@ -514,6 +514,13 @@ class LM(object):
 
       except tf.errors.OutOfRangeError:
         break
+
+    # for debugging score function
+    predictions_save_path = '/usr0/home/gis/research/enas_re/tmp/datasets/tacred/output/prediction_debugging.pkl'
+    predictions_debugging = {'all_labels': all_labels, 'all_predictions': all_predictions}
+    print('saving predictions to: {}'.format(predictions_save_path))
+    with open(predictions_save_path, 'rb') as handle:
+      pickle.dump(predictions_debugging, handle)
 
     prec_micro, recall_micro, f1_micro = score(all_labels, all_predictions)
     valid_ppl = np.exp(total_loss / tot_batches)
