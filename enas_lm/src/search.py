@@ -207,7 +207,7 @@ def train(params):
       accum_step += 1
       step = sess.run(ops['global_step'])
       if step % params.log_every == 0:
-        train_ppl = np.exp(accum_loss / accum_step)
+        train_ppl = accum_loss / accum_step
         mins_so_far = (time.time() - start_time) / 60.
         log_string = 'epoch={0:<5d}'.format(epoch)
         log_string += ' step={0:<7d}'.format(step)

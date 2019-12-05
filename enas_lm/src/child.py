@@ -177,16 +177,14 @@ class LM(object):
     self.sample_arc = tf.unstack(controller.sample_arc)
     self.name = name
     self.base_bptt = params.base_bptt
-    # TODO: Figure out use of these
-    self.num_train_batches = None
-    self.reset_start_idx = None
-    self.should_reset = None
+    # self.num_train_batches = None
+    # self.reset_start_idx = None
+    # self.should_reset = None
     # train data
     # (self.x_train, self.y_train,
     #  self.num_train_batches, self.reset_start_idx,
     #  self.should_reset, self.base_bptt) = data_utils.input_producer(
     #      x_train, params.batch_size, params.bptt_steps, random_len=True)
-    # # TODO: Add this hyperparameter in the params config as default!
     # params.add_hparam(
     #     'num_train_steps', self.num_train_batches * params.num_train_epochs)
 
@@ -425,7 +423,8 @@ class LM(object):
           [self.params.batch_size, 1, self.params.hidden_size], training=True)
 
     logits = tf.einsum('ijk,kl->ijl', top_s, w_soft) + b_soft
-    logits = logits * token_mask
+    # token mask: 1=padding, 0 = no padding. So we flip the mask before applying the filter
+    logits = logits * (1. - token_mask)
     # [BatchSize, NumSteps, NumClass] -> [BatchSize, NumClass]
     self.logits = tf.reduce_mean(logits, axis=1)
 
@@ -523,7 +522,7 @@ class LM(object):
       pickle.dump(predictions_debugging, handle)
 
     prec_micro, recall_micro, f1_micro = score(all_labels, all_predictions)
-    valid_ppl = np.exp(total_loss / tot_batches)
+    valid_ppl = total_loss / tot_batches
     print('valid_ppl={0:<.2f}'.format(valid_ppl))
 
     return valid_ppl, prec_micro, recall_micro, f1_micro

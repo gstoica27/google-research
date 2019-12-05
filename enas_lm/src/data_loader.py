@@ -185,9 +185,8 @@ class DataLoader(object):
         mask = tf.random_uniform(shape, dtype=tf.float32)
         # Ensures keep_prob can range between [0, 1]. i.e.
         # keep_prob=0 doesn't result in divide by zero nans
-        dropout_mask = tf.floor(mask + keep_prob) / tf.cond(tf.less_equal(keep_prob, epsilon),
-                                                            lambda: 1.,
-                                                            lambda: keep_prob)
+        dropout_mask = tf.floor(mask + keep_prob)
+                                # / tf.cond(tf.less_equal(keep_prob, epsilon), lambda: 1., lambda: keep_prob))
         return dropout_mask
 
     def train_dataset(self,
