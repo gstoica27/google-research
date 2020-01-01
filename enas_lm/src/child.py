@@ -245,7 +245,9 @@ class LM(object):
     print('Building model params')
     initializer = tf.initializers.random_uniform(minval=-self.params.init_range,
                                                  maxval=self.params.init_range)
+    # number of activation functions available
     num_functions = self.params.controller_num_functions
+    # number of layers in RNN
     num_layers = self.params.controller_num_layers
     hidden_size = self.params.hidden_size
     with tf.variable_scope(self.name, initializer=initializer):
